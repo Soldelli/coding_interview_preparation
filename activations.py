@@ -10,7 +10,6 @@
     - GeLU
 
     Future integrations:
-    - GeLU
     - SeLU
 ''' 
 
