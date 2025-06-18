@@ -36,7 +36,6 @@ def L2_loss(predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     diff = predictions - targets
     return (diff * diff).mean()  
 
-
 def cross_entropy_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     '''
         logits: shape [N, C]
@@ -92,8 +91,58 @@ def binary_cross_entropy_with_logits_loss(logits: torch.Tensor, targets: torch.T
     # max_val = max(logits, 0)
     max_val = torch.clamp(logits, min=0)
 
-    loss = -(targets * torch.log(probabilities + eps) + (1.0 - targets) * torch.log(1.0 - probabilities + eps))
+    # term 1 is max_val - x*y
+    term_1 = max_val - logits * targets
+
+    # term 2 log(1+exp(-abs(x)))
+    # term_2 = torch.log(1 + torch.exp(- torch.abs(logits)))
+    term_2 = torch.logaddexp(torch.tensor(0.0, device=logits.device), -logits.abs())  #logaddexp(x,y) = log(exp(x) + exp(y))
+
+    loss = term_1 + term_2
     return loss.mean()
+
+def hinge_loss(scores: torch.Tensor, targets: torch.Tensor, margin: float = 1.0) -> torch.Tensor:
+    '''
+        
+    '''
+    # Flatten tensor if needed
+    scores = logits.view(-1)
+    targets = targets.view(-1)
+
+    # max_val = max(logits, 0)
+    hinge_term = margin - scores * targets
+
+    loss= torch.clamp(hinge_term, min = 0)
+    return loss.mean()
+
+
+def metrics_question_1(predictions:torch.Tensor, targets:torch.Tensor) -> dict:
+
+    assert len(predictions.shape) == 2, f'The input predictions need to be of shape [N,C] but shape {predictions.shape} was found'
+    assert len(targets.shape) == 1 or (len(targets.shape) == 2 and targets.shape[-1] == 1), f'The targets need to be of shape [N,] or [N,1] but shape {targets.shape} was found'
+
+    metrics = {'mse':None, 'ce':None, 'acc':None}
+
+    if targets.dtype in (torch.int32, torch.int64):
+        # accuracy
+        targets = targets.view(-1)
+        hit = torch.argmax(predictions, dim=-1)
+        metrics['acc'] = (hit == targets).float().mean()
+
+        # cross entropy
+        n = predictions.shape[0]
+        log_sum_exp = torch.logsumexp(predictions, dim=1)
+        logit_correct_class = predictions[torch.arange(n), targets]
+        metrics['ce'] = (log_sum_exp - logit_correct_class).mean()
+
+
+    else:
+        # Regression case
+        metrics['mse'] = ((predictions - targets)**2).mean()
+
+    return metrics
+
+
 
 if __name__ == "__main__":
     # Example usage

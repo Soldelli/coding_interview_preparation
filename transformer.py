@@ -24,20 +24,23 @@ class PositionalEncoding(nn.Module):
     
     
 def scaled_dot_product_attention(query, key, value, mask=None):
+    '''
+        query, key, value: [batch_size, num_heads, seq_len, d_k]
+        mask: [batch_size, 1, seq_length, seq_length]
+    '''
     d_k = query.size(-1)
-    scores = torch.matmul(query, key.transpose(-2,-1)) / math.sqrt(d_k)
+    scores = torch.matmul(query, key.transpose(-2,-1)) / math.sqrt(d_k)    # (batch_size, num_heads, seq_length, seq_length)
 
     if mask is not None:
-        scores = scores.masked_fill(mask ==0, float('-inf'))
+        scores = scores.masked_fill(mask ==0, float('-inf'))  #[batch_size, 1, seq_length, seq_length]
 
-    attn_weights = F.softmax(scores, dim=-1)
-    output = torch.matmul(attn_weights, value)
+    attn_weights = F.softmax(scores, dim=-1)    # (batch_size, num_heads, seq_length, seq_length)
+    output = torch.matmul(attn_weights, value)  # (batch_size, num_heads, seq_length, d_k)
     return output, attn_weights
 
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model, num_heads):
-
         super(MultiHeadAttention, self).__init__()
 
         assert d_model % num_heads==0, 'd_model must be divisible by num_heads'
@@ -58,13 +61,13 @@ class MultiHeadAttention(nn.Module):
         K = self.w_k(key)
         V = self.w_v(value)
 
-        # reshape to [batch_size, seq_len, num_heads, d_k]
-        Q = Q.view(batch_size, -1, self.num_heads, self.d_k).transpose(1,2)
-        K = K.view(batch_size, -1, self.num_heads, self.d_k).transpose(1,2)
+        # Reshape: (batch_size, seq_len, d_model) → (batch_size, num_heads, seq_len, d_k)
+        Q = Q.view(batch_size, -1, self.num_heads, self.d_k).transpose(1,2)  
+        K = K.view(batch_size, -1, self.num_heads, self.d_k).transpose(1,2)  
         V = V.view(batch_size, -1, self.num_heads, self.d_k).transpose(1,2)
 
         # Compute self attention
-        attn_output, attn_weights = scaled_dot_product_attention(Q,V,K,mask=mask)
+        attn_output, attn_weights = scaled_dot_product_attention(Q,K,V,mask=mask)
 
         # reshape outputs to d_model size
         attn_output = attn_output.transpose(1,2).contiguous().view(batch_size, -1, self.d_model)
